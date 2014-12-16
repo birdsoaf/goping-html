@@ -1,0 +1,23 @@
+{
+  "name": "goping-html",
+  "version": "0.0.0",
+  "authors": [
+    "Alex Shulman <alex@maraxi.com>"
+  ],
+  "license": "GPL v2",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "socket.io-client": "~1.2.1",
+    "cubism": "~1.6.0",
+    "d3": "~3.5.2",
+    "jquery": "~2.1.1",
+    "colorbrewer": "~1.0.0"
+  }
+}

@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Socket.IO chat</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial; }
+      form { background: #000; padding: 3px; position: fixed; bottom: 0; width: 100%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; }
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+    </style>
+  </head>
+  <body>
+    <div id="chart_B"></div>
+    <p><button id="toggle">Stop</button></p>
+    <ul id="messages"></ul>
+    <form action="">
+      <input id="m" autocomplete="off" /><button>Send</button>
+    </form>
+    <script src="/socket.io-client/socket.io.js"></script>
+    <script src="/jquery/dist/jquery.min.js"></script>
+    <script src="/d3/d3.min.js"></script>
+    <script src="/cubism/cubism.v1.min.js"></script>
+    <script src="/colorbrewer/colorbrewer.js"></script>
+    <script>
+      var socket = io();
+
+      var ping_queue = []
+
+      $('form').submit(function(){
+        socket.emit('chat message', $('#m').val());
+        $('#m').val('');
+        return false;
+      });
+      socket.on('chat message', function(msg){
+        $('#messages').append($('<li>').text(msg));
+      });
+
+      socket.on('ping message', function(msg){
+        ping_queue.append(msg)
+        console.log(msg)
+        // $('#messages').append($('<li>').text(msg));
+      });
+
+      var incoming_pings=[]
+
+      // Keep track if we already initialized a metric,
+      // so we don't fill the chart with useless start/stop data
+      //
+      var initialized_metrics = {};
+
+      // Return a named context `metric` [https://github.com/square/cubism/wiki/Context#wiki-metric],
+      // based on the original demo: http://square.github.com/cubism/demo
+      //
+      function my_metric(name) {
+        return context.metric(function(start, stop, step, callback) {
+          // console.log(name + ':', start, stop, step)
+
+          var values = [],
+              value  = 0;
+
+          // Convert `start` and `stop` to milliseconds
+          //
+          start = +start;
+          stop = +stop;
+
+          // Return pseudo-random number [https://github.com/mbostock/d3/wiki/Math#wiki-random_normal]
+          //
+          value = Math.round( Math.abs( d3.random.normal(30,70)() ) );
+
+
+          // Cubism.js expects a value for every "slot" based on the `start` and `stop` parameters, because
+          // it assumes a backend such as [_Graphite_](https://github.com/square/cubism/wiki/Graphite),
+          // which is able to return values stored over time.
+          //
+          // In our case, we don't have any data stored: we poll the API repeatedly.
+          //
+          // On first call, Cubism.js calls the metric callback function with a large `start` and `stop` gap,
+          // based on the `step` and `size` values of your chart. This would spoil the chart with a useless
+          // "thick colored line".
+          //
+          // So: if we have already initialized this metric, push the same value to all the "slots",
+          // because this is what Cubism.js expects...
+          //
+          if (initialized_metrics[name]) {
+            while (start < stop) {
+              start += step;
+              values.push(value);
+            }
+          // ... otherwise mark this metric as initialized and fill the empty slots with `NaN`s.
+          //
+          } else {
+            initialized_metrics[name] = true;
+            while (start < (stop - step)) {
+              start += step;
+              values.push(NaN);
+            }
+            values.push(value);
+          }
+
+          // ******* DEBUG ********
+          //console.log(name + ': ' + value)
+          // console.log(values)
+          // **********************
+
+          // Execute the passed callback function, passing it values
+          //
+          callback(null, values);
+
+        }, name);
+      }
+
+    </script>
+
+    <script>
+
+    // Setup the Cubism.js context
+    //
+    var context = cubism.context()
+        .serverDelay(10*1000)
+        .clientDelay(0)
+        .step(250)
+        .size(960);
+
+    // Configure some fake "metrics"
+    //
+    // var foo = my_metric("foo");
+    // var bar = my_metric("bar");
+    var baz = my_metric("baz");
+
+        // // Create chart A
+        // //
+        // d3.select("#chart_A").call(function(div) {
+
+        //   // * Top ticks (time)
+        //   //
+        //   div.append("div")
+        //       .attr("class", "axis top")
+        //       .call(context.axis().orient("top"));
+
+        //   // * The rule
+        //   //
+        //   div.append("div")
+        //       .attr("class", "rule")
+        //       .call(context.rule());
+
+        //   // * Horizon chart
+        //   //
+        //   div.selectAll(".horizon")
+        //       .data([foo,bar])
+        //     .enter().append("div")
+        //       .attr("class", "horizon")
+        //       .call(context.horizon()
+        //         .height(50)
+        //       );
+
+        // });
+
+        // Create chart B with custom colors (Brewer)
+        //
+        d3.select("#chart_B").call(function(div) {
+          div.selectAll(".horizon")
+              .data([baz])
+            .enter().append("div")
+              .attr("class", "horizon")
+              .call(context.horizon()
+                .height(50)
+                .colors(colorbrewer.Reds[8])
+              );
+        });
+
+        // On mousemove, move the labels along with the rule
+        //
+        context.on("focus", function(i) {
+          d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
+        });
+
+        // Hook up the start/stop button
+        //
+        d3.select("#toggle").on("click",
+          function() {
+            var button = d3.select(this);
+
+            if (button.text() == 'Stop') { button.text('Start'); context.stop();  }
+            else                         { button.text('Stop');  context.start(); }
+          }
+        );
+
+    </script>
+  </body>
+</html>
