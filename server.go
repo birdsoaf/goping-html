@@ -23,25 +23,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var p *fastping.Pinger
+	p = StartPingEmitter("google.com", server)
+
 	server.On("connection", func(so socketio.Socket) {
 		// Store this by connection ID or something
-		var p *fastping.Pinger
 		log.Println("on connection")
 		so.Join("chat")
 		so.On("chat message", func(msg string) {
 			fmt.Println(msg)
 			switch {
 			case msg == "start ping":
-				p = StartPingEmitter("google.com", so)
+				fmt.Print("Start Ping (Already Started)")
 			case msg == "stop ping":
+				fmt.Print("Stop Ping")
 				p.Stop()
 			}
-
-			// Old single call pinger.
-			// onRecv := make(chan response)
-			// fastpinger("google.com", onRecv)
-			// res := <-onRecv
-			// fmt.Println(res.rtt)
 			log.Println("emit:", so.Emit("chat message", msg))
 			so.BroadcastTo("chat", "chat message", msg)
 		})
@@ -59,7 +56,7 @@ func main() {
 	log.Fatal(http.ListenAndServe(":5000", nil))
 }
 
-func StartPingEmitter(url string, so socketio.Socket) *fastping.Pinger {
+func StartPingEmitter(url string, server *socketio.Server) *fastping.Pinger {
 	p := fastping.NewPinger()
 	netProto := "ip4:icmp"
 	if strings.Index(url, ":") != -1 {
@@ -80,7 +77,8 @@ func StartPingEmitter(url string, so socketio.Socket) *fastping.Pinger {
 		onIdle <- true
 	}
 
-	p.MaxRTT = time.Second
+	//p.MaxRTT = time.Second
+	p.MaxRTT = time.Millisecond * 250
 	p.RunLoop()
 	go func() {
 		for {
@@ -93,10 +91,11 @@ func StartPingEmitter(url string, so socketio.Socket) *fastping.Pinger {
 				for host, r := range results {
 					if r == nil {
 						fmt.Printf("%s : unreachable %v\n", host, time.Now())
+						server.BroadcastTo("chat", "ping message", "0")
 					} else {
 						msg := fmt.Sprintf("%s : %v %v\n", host, r.rtt, time.Now())
 						fmt.Print(msg)
-						so.Emit("ping message", strings.Replace(r.rtt.String(), "ms", "", -1))
+						server.BroadcastTo("chat", "ping message", strings.Replace(r.rtt.String(), "ms", "", -1))
 					}
 					results[host] = nil
 				}

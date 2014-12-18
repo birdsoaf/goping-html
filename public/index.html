@@ -14,7 +14,7 @@
     </style>
   </head>
   <body>
-    <div id="chart_B"></div>
+    <div id="chart_A"></div>
     <p><button id="toggle">Stop</button></p>
     <ul id="messages"></ul>
     <form action="">
@@ -26,9 +26,36 @@
     <script src="/cubism/cubism.v1.min.js"></script>
     <script src="/colorbrewer/colorbrewer.js"></script>
     <script>
+
+      function simple_moving_averager() {
+          var nums = [];
+          return function(num) {
+              nums.push(num);
+              if (nums.length > 3600)
+                  nums.splice(0,1);  // Stop Rolling Average @ 10 mintes
+              var one_sec = average_array_end(nums, 4)
+              var ten_sec = average_array_end(nums, 40)
+              var one_min = average_array_end(nums, 360)
+              var ten_min = average_array_end(nums, 3600)
+              return(one_sec, ten_sec, one_min, ten_min);
+          }
+      }
+
+      function average_array_end(a, length){
+        var sum = 0;
+        for (i=0; i < length; i++){
+          sum += a[a.length-(1+i)] // Last x numbers
+        }
+        if (a.length < length) {
+          return sum/a.length
+        }
+        return sum/length
+      }
+
       var socket = io();
 
       var ping_queue = []
+      var ma = simple_moving_averager()
 
       $('form').submit(function(){
         socket.emit('chat message', $('#m').val());
@@ -40,12 +67,14 @@
       });
 
       socket.on('ping message', function(msg){
-        ping_queue.append(msg)
-        console.log(msg)
-        // $('#messages').append($('<li>').text(msg));
+        if (msg[0] != '0'){
+          var num = parseFloat(msg[0]).toFixed(4);
+          ping_queue.push(num);
+          console.log(ma(num));
+        }else{
+          ping_queue.push("999"); 
+        }
       });
-
-      var incoming_pings=[]
 
       // Keep track if we already initialized a metric,
       // so we don't fill the chart with useless start/stop data
@@ -69,7 +98,8 @@
 
           // Return pseudo-random number [https://github.com/mbostock/d3/wiki/Math#wiki-random_normal]
           //
-          value = Math.round( Math.abs( d3.random.normal(30,70)() ) );
+          value = ping_queue.shift()
+          //value = Math.round( Math.abs( d3.random.normal(30,70)() ) );
 
 
           // Cubism.js expects a value for every "slot" based on the `start` and `stop` parameters, because
@@ -120,62 +150,73 @@
     // Setup the Cubism.js context
     //
     var context = cubism.context()
-        .serverDelay(10*1000)
+        .serverDelay(0)
         .clientDelay(0)
         .step(250)
-        .size(960);
+        .size(document.documentElement.clientWidth-25);
 
     // Configure some fake "metrics"
     //
-    // var foo = my_metric("foo");
-    // var bar = my_metric("bar");
-    var baz = my_metric("baz");
+    var foo = my_metric("foo");
+    //var baz = my_metric("baz");
 
-        // // Create chart A
-        // //
-        // d3.select("#chart_A").call(function(div) {
-
-        //   // * Top ticks (time)
-        //   //
-        //   div.append("div")
-        //       .attr("class", "axis top")
-        //       .call(context.axis().orient("top"));
-
-        //   // * The rule
-        //   //
-        //   div.append("div")
-        //       .attr("class", "rule")
-        //       .call(context.rule());
-
-        //   // * Horizon chart
-        //   //
-        //   div.selectAll(".horizon")
-        //       .data([foo,bar])
-        //     .enter().append("div")
-        //       .attr("class", "horizon")
-        //       .call(context.horizon()
-        //         .height(50)
-        //       );
-
-        // });
-
-        // Create chart B with custom colors (Brewer)
+        // Create chart A
         //
-        d3.select("#chart_B").call(function(div) {
+        d3.select("#chart_A").call(function(div) {
+
+          // * Top ticks (time)
+          //
+          div.append("div")
+              .attr("class", "axis top")
+              .call(context.axis().orient("top"));
+
+          // div.append("div")
+          //     .attr("class", "axis")
+          //     .call(context.axis().orient("left"));
+
+          // * The rule
+          //
+          div.append("div")
+              .attr("class", "rule")
+              .call(context.rule());
+
+          // * Horizon chart
+          //
           div.selectAll(".horizon")
-              .data([baz])
+              .data([foo])
             .enter().append("div")
               .attr("class", "horizon")
               .call(context.horizon()
-                .height(50)
-                .colors(colorbrewer.Reds[8])
+                .height(150)
               );
+
         });
+
+        // // Create chart B with custom colors (Brewer)
+        // //
+        // d3.select("#chart_B").call(function(div) {
+        //   div.selectAll(".axis")
+        //       .data([baz])
+        //     .enter().append("div")
+        //       .attr("class", "horizon")
+        //       .call(context.horizon()
+        //         .height(125)
+        //          .colors(colorbrewer.RdYlGn[8])
+        //       );
+        // });
+
+        // d3.select("#chart_B").append("svg")
+        //   .attr("class", "axis")
+        //     .attr("width", 1440)
+        //     .attr("height", 30)
+        //     .append("g")
+        //     .attr("transform", "translate(0,30)")
+        //     .call(axis);
 
         // On mousemove, move the labels along with the rule
         //
         context.on("focus", function(i) {
-          d3.selectAll(".value").style("right", i == null ? null : context.size() - i + "px");
+          d3.selectAll(".value").style("bottom", i == null ? null : context.size() - i + "px");
         });
 
         // Hook up the start/stop button
