@@ -63,7 +63,7 @@ func main() {
 
 	http.Handle("/socket.io/", server)
 	http.Handle("/", http.FileServer(http.Dir("./public")))
-	http.Handle("/add/{url}", handler)
+	//http.Handle("/add/{url}", handler)
 	log.Println("Serving at localhost:5000...")
 	log.Fatal(http.ListenAndServe(":5000", nil))
 }
@@ -99,7 +99,6 @@ func StartPingEmitter(urls []string, server *socketio.Server) *PingManger {
 		onIdle <- true
 	}
 
-	//p.MaxRTT = time.Second
 	pm.p.MaxRTT = time.Millisecond * 250
 	pm.p.RunLoop()
 	go func() {
