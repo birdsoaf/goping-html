@@ -1,6 +1,6 @@
 {
   "name": "goping-html",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "authors": [
     "Alex Shulman <alex@maraxi.com>"
   ],
@@ -15,9 +15,9 @@
   ],
   "dependencies": {
     "socket.io-client": "~1.2.1",
-    "cubism": "~1.6.0",
     "d3": "~3.5.2",
     "jquery": "~2.1.1",
-    "colorbrewer": "~1.0.0"
+    "jquery-ui": "~1.11.2",
+    "rickshaw": "~1.5.1"
   }
 }
